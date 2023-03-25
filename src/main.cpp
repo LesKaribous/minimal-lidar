@@ -1,8 +1,9 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 #include <U8g2lib.h>
+#include "LD06.h"
 
-#define LIDAR_SERIAL Serial1
+LD06 lidar;
 
 const int LED_PIN = 4, LED_COUNT = 35 ;
 const int MAX_LED_WIDHT = 5 ;
@@ -17,20 +18,15 @@ void cleanStrip();
 void circularTestStrip();
 void randomTestStrip();
 void drawAngle(int orientation, int width);
+void testLidar();
 
 void setup() {
   u8g2.begin();
+  // Begin the serial transmission with the lidar
+  lidar.Init();
   strip.begin();
   strip.show();
   strip.setBrightness(5);
-  // Begin the serial transmission with the lidar
-  LIDAR_SERIAL.begin(230400);
-  // Check the serial link with the lidar
-  // Wait for the lidar to connect
-  while (!LIDAR_SERIAL.available())
-  {
-    colorWipe(strip.Color(50,0,0),30);
-  }
   colorWipe(strip.Color(0,50,0),30);
   // Clean and start the main program
   colorWipe(strip.Color(0,0,0), 30);
@@ -125,4 +121,18 @@ void drawAngle(int orientation, int width)
     }
   }
   strip.show();
+}
+
+void testLidar(){
+  //Serial.println("data start");
+  lidar.read_lidar_data();
+
+  Serial.printf("start_bytet:%d, data_length:%d, Speed:%f, FSA:%f, LSA:%f, time_stamp:%d, CS:%d",
+                lidar.start_byte, lidar.data_length, lidar.Speed, lidar.FSA, lidar.LSA, lidar.time_stamp, lidar.CS);
+  Serial.println();
+
+  for (int i = 0; i < lidar.data_length; i++) {
+    if (lidar.angles[i] > -3 && lidar.angles[i] < 3 && lidar.distances[i] < 300)
+      Serial.print("Hit!");
+  }
 }
