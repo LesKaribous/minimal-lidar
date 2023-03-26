@@ -36,7 +36,6 @@
 
 */
 
-
 #include "U8x8lib.h"
 
 #ifdef ARDUINO

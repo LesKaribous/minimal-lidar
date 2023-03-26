@@ -1,7 +1,14 @@
 #include "LD06.h"
 
 void LD06::Init() {
-  Serial1.begin(230400, SERIAL_8N1);
+  Serial1.setRX(0);
+  Serial1.begin(230400,SERIAL_8N1);
+  delay(500);
+  while(!Serial1.available()) {
+    Serial.println("Retry");
+    Serial1.begin(230400,SERIAL_8N1);
+    delay(500);
+  }
 }
 
 void LD06::calc_lidar_data(std::vector<char> &values) {
@@ -20,12 +27,11 @@ void LD06::calc_lidar_data(std::vector<char> &values) {
     angle_step = (LSA + (360 - FSA)) / (data_length - 1);
   }
 
-  // note: 刻み幅の異常を検知
+  // Enleve les valeurs étranges
   if (angle_step > 20) {
     return;
   }
 
-  // note: 過去のデータを初期化
   angles.clear();
   confidences.clear();
   distances.clear();
@@ -43,8 +49,12 @@ std::vector<char> tmpChars;
 
 void LD06::read_lidar_data() {
 
-  // note: Serial２が機能していない場合はスキップ
-  if (!Serial1.available()) {
+  while (!Serial1.available()) {
+    /*
+    Serial.println("Retry");
+    Serial1.begin(230400,SERIAL_8N1);
+    delay(500);
+    */
     return;
   }
 

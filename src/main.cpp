@@ -10,7 +10,7 @@ const int MAX_LED_WIDHT = 5 ;
 const int SDA_PIN = 18, SCL_PIN = 19 ;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
-U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R2,SCL_PIN,SDA_PIN);
+//U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R2,SCL_PIN,SDA_PIN);
 
 void colorWipe(uint32_t color, int wait);
 void testOled();
@@ -21,7 +21,9 @@ void drawAngle(int orientation, int width);
 void testLidar();
 
 void setup() {
-  u8g2.begin();
+  //u8g2.begin();
+  Serial.begin(115200);
+  Serial.println("Hello !");
   // Begin the serial transmission with the lidar
   lidar.Init();
   strip.begin();
@@ -30,12 +32,13 @@ void setup() {
   colorWipe(strip.Color(0,50,0),30);
   // Clean and start the main program
   colorWipe(strip.Color(0,0,0), 30);
-  testOled();
-  circularTestStrip();
+  //testOled();
+  //circularTestStrip();
 }
 
 void loop() {
-  randomTestStrip();
+  //randomTestStrip();
+  testLidar();
 }
 
 void circularTestStrip()
@@ -68,6 +71,7 @@ void randomTestStrip(){
   cleanStrip();
 }
 
+/*
 void testOled(){
   u8g2.setFont(u8g2_font_ncenB14_tr);
   u8g2.firstPage();
@@ -77,6 +81,7 @@ void testOled(){
   } while ( u8g2.nextPage() );
   delay(1000);
 }
+*/
 
 void cleanStrip(){
   for(int i=0; i<strip.numPixels(); i++) strip.setPixelColor(i, 0);  
@@ -126,13 +131,23 @@ void drawAngle(int orientation, int width)
 void testLidar(){
   //Serial.println("data start");
   lidar.read_lidar_data();
-
+  /*
   Serial.printf("start_bytet:%d, data_length:%d, Speed:%f, FSA:%f, LSA:%f, time_stamp:%d, CS:%d",
                 lidar.start_byte, lidar.data_length, lidar.Speed, lidar.FSA, lidar.LSA, lidar.time_stamp, lidar.CS);
   Serial.println();
-
-  for (int i = 0; i < lidar.data_length; i++) {
-    if (lidar.angles[i] > -3 && lidar.angles[i] < 3 && lidar.distances[i] < 300)
-      Serial.print("Hit!");
+  */
+  for (int i = 0; i < lidar.data_length; i++) 
+  {
+    if (lidar.distances[i] < 65535.0)
+    {
+      Serial.print(">angle:");
+      Serial.println(lidar.angles[i]);
+      Serial.print(">distance:");
+      Serial.println(lidar.distances[i]);
+    }
+    
+    if (lidar.distances[i] > 300.0 && lidar.distances[i] < 1000){
+      drawAngle(lidar.angles[i], 999);
+    }
   }
 }
