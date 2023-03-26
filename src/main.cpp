@@ -1,13 +1,15 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
 #include <U8g2lib.h>
-#include "LD06.h"
+#include "ld06.h"
 
 LD06 lidar;
 
 const int LED_PIN = 4, LED_COUNT = 35 ;
 const int MAX_LED_WIDHT = 5 ;
 const int SDA_PIN = 18, SCL_PIN = 19 ;
+
+long lastClean = 0;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 //U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R2,SCL_PIN,SDA_PIN);
@@ -19,13 +21,14 @@ void circularTestStrip();
 void randomTestStrip();
 void drawAngle(int orientation, int width);
 void testLidar();
+void ringLidar(int seuil);
 
 void setup() {
   //u8g2.begin();
   Serial.begin(115200);
   Serial.println("Hello !");
   // Begin the serial transmission with the lidar
-  lidar.Init();
+  lidar.init(6);
   strip.begin();
   strip.show();
   strip.setBrightness(5);
@@ -38,7 +41,8 @@ void setup() {
 
 void loop() {
   //randomTestStrip();
-  testLidar();
+  //testLidar();
+  ringLidar(1000);
 }
 
 void circularTestStrip()
@@ -86,6 +90,7 @@ void testOled(){
 void cleanStrip(){
   for(int i=0; i<strip.numPixels(); i++) strip.setPixelColor(i, 0);  
   strip.show();
+  lastClean = millis();
 }
 
 void colorWipe(uint32_t color, int wait) {
@@ -99,7 +104,7 @@ void colorWipe(uint32_t color, int wait) {
 void drawAngle(int orientation, int width)
 {
   //  Orientation doit être inférieure à 360°
-  byte ledCenter  = map(orientation,0,359,0,LED_COUNT);
+  byte ledCenter  = map(orientation,0,359,LED_COUNT,0);
   byte ledWidth   = map(width,0,1000,MAX_LED_WIDHT,0);
 
   byte widthColor = map(width,0,1000,255,0);
@@ -128,26 +133,40 @@ void drawAngle(int orientation, int width)
   strip.show();
 }
 
-void testLidar(){
-  //Serial.println("data start");
-  lidar.read_lidar_data();
-  /*
-  Serial.printf("start_bytet:%d, data_length:%d, Speed:%f, FSA:%f, LSA:%f, time_stamp:%d, CS:%d",
-                lidar.start_byte, lidar.data_length, lidar.Speed, lidar.FSA, lidar.LSA, lidar.time_stamp, lidar.CS);
-  Serial.println();
-  */
-  for (int i = 0; i < lidar.data_length; i++) 
+void testLidar()
+{
+  // Utilise TelePlot pour tracer la map de la pièce (test du lidar)
+  if(lidar.readFullScan())
   {
-    if (lidar.distances[i] < 65535.0)
+    lidar.teleplotPrintScan();
+  }
+}
+
+void ringLidar(int seuil)
+{
+  // Trace les points de detection sur le ring de led en fonction de la distance donnée
+  if(lidar.readFullScan())
+  {
+    for (uint16_t i = 0; i < lidar.scan.size(); i++) 
     {
-      Serial.print(">angle:");
-      Serial.println(lidar.angles[i]);
-      Serial.print(">distance:");
-      Serial.println(lidar.distances[i]);
+      int objDistance = int(lidar.scan[i].distance);
+      int objAngle = int(lidar.scan[i].angle);
+
+      if (objDistance > 200 && objDistance < seuil)
+      {
+        int ledCenter  = map(objAngle,0,359,0,LED_COUNT);
+        int ledRed    = map(objDistance,200,1000,255,0);
+        int ledGreen  = map(objDistance,200,1000,0,255);
+        Serial.print(objAngle);
+        Serial.print(",");
+        Serial.println(objDistance);
+        strip.setPixelColor(ledCenter, strip.Color(ledRed,   ledGreen,   10));
+      }
     }
-    
-    if (lidar.distances[i] > 300.0 && lidar.distances[i] < 1000){
-      drawAngle(lidar.angles[i], 999);
-    }
+    strip.show();
+  }
+  if(millis()-lastClean >= 500)
+  {
+    cleanStrip();
   }
 }
