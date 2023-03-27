@@ -12,7 +12,7 @@ const int SDA_PIN = 18, SCL_PIN = 19 ;
 long lastClean = 0;
 
 int heading = 0; // Angle du regard
-int range   = 0; // Distance du regard
+int range   = 400; // Distance du regard
 volatile bool newData = false;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
@@ -32,6 +32,7 @@ bool isHeadingInSector(int cAngle, int cHeading, int cSector);
 void setup() {
   //u8g2.begin();
   Serial.begin(115200);
+  Serial3.begin(115200);
   Serial.println("Hello !");
   // Begin the serial transmission with the lidar
   lidar.init(6);
@@ -49,7 +50,7 @@ void loop() {
   //randomTestStrip();
   //testLidar();
   checkNeworder();
-  ringLidar(heading,range,30);
+  ringLidar(heading,range,50);
 }
 
 void circularTestStrip()
@@ -162,8 +163,8 @@ void ringLidar(int lHeading, int lRange, int lSector)
       if (objDistance > 200 && objDistance < lRange && isHeadingInSector(objAngle,lHeading,lSector))
       {
         int ledCenter  = map(objAngle,0,359,0,LED_COUNT);
-        int ledRed    = map(objDistance,200,1000,255,0);
-        int ledGreen  = map(objDistance,200,1000,0,255);
+        int ledRed    = map(objDistance,200,lRange,255,0);
+        int ledGreen  = map(objDistance,200,lRange,0,255);
 
         /*
         Serial.print("Detection en ");
@@ -172,6 +173,11 @@ void ringLidar(int lHeading, int lRange, int lSector)
         Serial.print(objDistance);
         Serial.println(" mm");
         */
+        Serial3.print("M");
+        Serial3.print(objAngle);
+        Serial3.print(",");
+        Serial3.print(objDistance);
+        Serial3.println(";");
 
         strip.setPixelColor(ledCenter, strip.Color(ledRed,   ledGreen,   10));
       }
@@ -216,7 +222,33 @@ void serialEvent() {
     int commaIndex = inputString.indexOf(',');
     int xIndex = 1;
     int yIndex = commaIndex + 1;
-    if (commaIndex != -1 && inputString.charAt(inputString.length() - 1) == ';') {
+    if (commaIndex != -1 && inputString.charAt(inputString.length() - 1) == ';') // -1 pour le serial USB
+    { 
+      // Conversion des données en entiers
+      String xString = inputString.substring(xIndex, commaIndex);
+      String yString = inputString.substring(yIndex, inputString.length() - 1); 
+      heading = xString.toInt();
+      range   = yString.toInt();
+      newData = true; // Active le flag newData lorsque des données sont disponibles
+    } else {
+      Serial.println("Invalid data format (; missing)");
+    }
+  } else {
+    Serial.println("Invalid data format (G missing)");
+  }
+}
+
+void serialEvent3() {
+  Serial.println("Reading...");
+  // Lit les données jusqu'à la fin de la trame
+  String inputString = Serial3.readStringUntil('\n');
+  if (inputString.charAt(0) == 'G') {
+    // Extraction des données à partir de la trame
+    int commaIndex = inputString.indexOf(',');
+    int xIndex = 1;
+    int yIndex = commaIndex + 1;
+    if (commaIndex != -1 && inputString.charAt(inputString.length() - 2) == ';') // -2 pour les serial hardware
+    {
       // Conversion des données en entiers
       String xString = inputString.substring(xIndex, commaIndex);
       String yString = inputString.substring(yIndex, inputString.length() - 1);
@@ -224,9 +256,9 @@ void serialEvent() {
       range   = yString.toInt();
       newData = true; // Active le flag newData lorsque des données sont disponibles
     } else {
-      Serial.println("Invalid data format");
+      Serial.println("Invalid data format on serial 3 (; missing)");
     }
   } else {
-    Serial.println("Invalid data format");
+    Serial.println("Invalid data format on serial 3 (G missing)");
   }
 }
