@@ -11,6 +11,10 @@ const int SDA_PIN = 18, SCL_PIN = 19 ;
 
 long lastClean = 0;
 
+int heading = 0; // Angle du regard
+int range   = 0; // Distance du regard
+volatile bool newData = false;
+
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 //U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R2,SCL_PIN,SDA_PIN);
 
@@ -21,7 +25,9 @@ void circularTestStrip();
 void randomTestStrip();
 void drawAngle(int orientation, int width);
 void testLidar();
-void ringLidar(int seuil);
+void ringLidar(int lHeading, int lRange, int lSector);
+void checkNeworder();
+bool isHeadingInSector(int cAngle, int cHeading, int cSector);
 
 void setup() {
   //u8g2.begin();
@@ -31,7 +37,7 @@ void setup() {
   lidar.init(6);
   strip.begin();
   strip.show();
-  strip.setBrightness(5);
+  strip.setBrightness(50);
   colorWipe(strip.Color(0,50,0),30);
   // Clean and start the main program
   colorWipe(strip.Color(0,0,0), 30);
@@ -42,7 +48,8 @@ void setup() {
 void loop() {
   //randomTestStrip();
   //testLidar();
-  ringLidar(1000);
+  checkNeworder();
+  ringLidar(heading,range,30);
 }
 
 void circularTestStrip()
@@ -142,7 +149,7 @@ void testLidar()
   }
 }
 
-void ringLidar(int seuil)
+void ringLidar(int lHeading, int lRange, int lSector)
 {
   // Trace les points de detection sur le ring de led en fonction de la distance donnée
   if(lidar.readFullScan())
@@ -152,21 +159,74 @@ void ringLidar(int seuil)
       int objDistance = int(lidar.scan[i].distance);
       int objAngle = int(lidar.scan[i].angle);
 
-      if (objDistance > 200 && objDistance < seuil)
+      if (objDistance > 200 && objDistance < lRange && isHeadingInSector(objAngle,lHeading,lSector))
       {
         int ledCenter  = map(objAngle,0,359,0,LED_COUNT);
         int ledRed    = map(objDistance,200,1000,255,0);
         int ledGreen  = map(objDistance,200,1000,0,255);
+
+        /*
+        Serial.print("Detection en ");
         Serial.print(objAngle);
-        Serial.print(",");
-        Serial.println(objDistance);
+        Serial.print("° à ");
+        Serial.print(objDistance);
+        Serial.println(" mm");
+        */
+
         strip.setPixelColor(ledCenter, strip.Color(ledRed,   ledGreen,   10));
       }
     }
     strip.show();
   }
-  if(millis()-lastClean >= 500)
+  // Supprime les points tous les 500ms
+  if(millis()-lastClean >= 500) cleanStrip();
+}
+
+bool isHeadingInSector(int cAngle, int cHeading, int cSector) {
+    int minHeading = cHeading - cSector;
+    int maxHeading = cHeading + cSector;
+    
+    // Vérifie si cAngle est dans l'intervalle angulaire [minHeading, maxHeading]
+    if ((cAngle >= minHeading && cAngle <= maxHeading) || 
+        (cAngle + 360 >= minHeading && cAngle + 360 <= maxHeading) ||
+        (cAngle - 360 >= minHeading && cAngle - 360 <= maxHeading)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+void checkNeworder(){
+  if (newData) 
   {
-    cleanStrip();
+    Serial.print("Look at: ");
+    Serial.print(heading);
+    Serial.print(", ");
+    Serial.println(range);
+    newData = false; // Réinitialise la variable newData
+  }
+}
+
+void serialEvent() {
+  Serial.println("Reading...");
+  // Lit les données jusqu'à la fin de la trame
+  String inputString = Serial.readStringUntil('\n');
+  if (inputString.charAt(0) == 'G') {
+    // Extraction des données à partir de la trame
+    int commaIndex = inputString.indexOf(',');
+    int xIndex = 1;
+    int yIndex = commaIndex + 1;
+    if (commaIndex != -1 && inputString.charAt(inputString.length() - 1) == ';') {
+      // Conversion des données en entiers
+      String xString = inputString.substring(xIndex, commaIndex);
+      String yString = inputString.substring(yIndex, inputString.length() - 1);
+      heading = xString.toInt();
+      range   = yString.toInt();
+      newData = true; // Active le flag newData lorsque des données sont disponibles
+    } else {
+      Serial.println("Invalid data format");
+    }
+  } else {
+    Serial.println("Invalid data format");
   }
 }
