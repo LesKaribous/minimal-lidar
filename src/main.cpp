@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
-#include <U8g2lib.h>
 #include "ld06.h"
 
 LD06 lidar;
@@ -13,13 +12,13 @@ long lastClean = 0;
 
 int heading = 0; // Angle du regard
 int range   = 400; // Distance du regard
-volatile bool newData = false;
+bool newData = false;
+bool ping = false;
+bool ld06Connected = false;
 
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
-//U8G2_SH1106_128X64_NONAME_1_HW_I2C u8g2(U8G2_R2,SCL_PIN,SDA_PIN);
 
 void colorWipe(uint32_t color, int wait);
-void testOled();
 void cleanStrip();
 void circularTestStrip();
 void randomTestStrip();
@@ -30,25 +29,27 @@ void checkNeworder();
 bool isHeadingInSector(int cAngle, int cHeading, int cSector);
 
 void setup() {
-  //u8g2.begin();
-  Serial.begin(115200);
-  Serial3.begin(115200);
-  Serial.println("Hello !");
-  // Begin the serial transmission with the lidar
-  lidar.init(6);
+
   strip.begin();
   strip.show();
-  strip.setBrightness(50);
+  strip.setBrightness(10);
+
+  Serial.begin(115200);   // Begin Serial USB
+  Serial3.begin(115200);  // Begin Serial MainBoard
+  lidar.init(6); // Begin the serial transmission with the lidar
+
+  while(!lidar.readFullScan()){delay(100);} // Wait data from Lidar
+  ld06Connected = true;
+  colorWipe(strip.Color(50,50,0),30);
+
+  while(!ping){delay(100);}  // Wait Serial communication
+
   colorWipe(strip.Color(0,50,0),30);
-  // Clean and start the main program
   colorWipe(strip.Color(0,0,0), 30);
-  //testOled();
-  //circularTestStrip();
+  
 }
 
 void loop() {
-  //randomTestStrip();
-  //testLidar();
   checkNeworder();
   ringLidar(heading,range,50);
 }
@@ -82,18 +83,6 @@ void randomTestStrip(){
   delay(1000);
   cleanStrip();
 }
-
-/*
-void testOled(){
-  u8g2.setFont(u8g2_font_ncenB14_tr);
-  u8g2.firstPage();
-  do {
-    u8g2.setCursor(0, 20);
-    u8g2.print(F("Hello World!"));
-  } while ( u8g2.nextPage() );
-  delay(1000);
-}
-*/
 
 void cleanStrip(){
   for(int i=0; i<strip.numPixels(); i++) strip.setPixelColor(i, 0);  
@@ -242,6 +231,12 @@ void serialEvent3() {
   Serial.println("Reading...");
   // Lit les données jusqu'à la fin de la trame
   String inputString = Serial3.readStringUntil('\n');
+
+  if (inputString == "Ping") {
+    ping = true;
+    if(ld06Connected) Serial3.println("Pong\n");
+  }
+
   if (inputString.charAt(0) == 'G') {
     // Extraction des données à partir de la trame
     int commaIndex = inputString.indexOf(',');
