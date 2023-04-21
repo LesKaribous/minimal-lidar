@@ -232,12 +232,11 @@ void serialEvent3() {
   // Lit les données jusqu'à la fin de la trame
   String inputString = Serial3.readStringUntil('\n');
 
-  if (inputString == "Ping") {
+  if (inputString.charAt(0) == 'P') {
     ping = true;
-    if(ld06Connected) Serial3.println("Pong\n");
+    if(ld06Connected) Serial3.println("Pong");
   }
-
-  if (inputString.charAt(0) == 'G') {
+  else if (inputString.charAt(0) == 'G') {
     // Extraction des données à partir de la trame
     int commaIndex = inputString.indexOf(',');
     int xIndex = 1;
@@ -254,6 +253,8 @@ void serialEvent3() {
       Serial.println("Invalid data format on serial 3 (; missing)");
     }
   } else {
-    Serial.println("Invalid data format on serial 3 (G missing)");
+    Serial.print("Received : ");
+    Serial.print(inputString);
+    Serial.println(" - Invalid data format on serial 3 (G missing)");
   }
 }
